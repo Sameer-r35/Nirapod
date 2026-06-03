@@ -54,8 +54,18 @@ export default async function SearchResultPage({ params }: PageProps) {
     reports = pr ?? []
   } else {
     const canonical    = normalizeFacebookUrl(decoded)
-    const { data: ed } = await supabase.from('entities').select('*').eq('canonical_id', canonical).single()
-    entity             = ed
+    console.log('DEBUG canonical:', canonical)
+console.log('DEBUG decoded:', decoded)
+    const { data: entityData, error: entityError } = await supabase
+  .from('entities')
+  .select('*')
+  .eq('canonical_id', canonical)
+  .single()
+
+console.log('DEBUG entity data:', entityData)
+console.log('DEBUG entity error:', entityError)
+
+entity = entityData
     if (entity) {
       const { data: rd } = await supabase.from('incident_reports').select('*')
         .eq('entity_id', entity.id).eq('status', 'verified').order('created_at', { ascending: false })
