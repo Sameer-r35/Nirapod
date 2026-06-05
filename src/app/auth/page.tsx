@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, Phone, ArrowRight, Loader2, CheckCircle } from 'lucide-react'
+import { Shield, Mail, ArrowRight, Loader2, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useMobile } from '@/hooks/use-mobile'
@@ -12,29 +12,23 @@ export default function AuthPage() {
   const isMobile = useMobile()
   const supabase = createClient()
 
-  const [phone, setPhone]       = useState('')
-  const [otp, setOtp]           = useState('')
-  const [step, setStep]         = useState<'phone' | 'otp'>('phone')
-  const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
-
-  function formatPhone(raw: string): string {
-    const digits = raw.replace(/\D/g, '')
-    if (digits.startsWith('0')) return '+88' + digits
-    if (digits.startsWith('88')) return '+' + digits
-    return '+88' + digits
-  }
+  const [email, setEmail]     = useState('')
+  const [otp, setOtp]         = useState('')
+  const [step, setStep]       = useState<'email' | 'otp'>('email')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]     = useState('')
 
   async function sendOtp() {
     setError('')
-    const digits = phone.replace(/\D/g, '')
-    if (digits.length !== 11) {
-      setError('Enter a valid 11-digit Bangladeshi mobile number.')
-      return
-    }
+    if (!email.includes('@')) { setError('Enter a valid email address.'); return }
     setLoading(true)
-    const formatted = formatPhone(phone)
-    const { error: err } = await supabase.auth.signInWithOtp({ phone: formatted })
+    const { error: err } = await supabase.auth.signInWithOtp({
+  email,
+  options: {
+    shouldCreateUser: true,
+    emailRedirectTo: undefined,
+  }
+})
     if (err) { setError(err.message); setLoading(false); return }
     setStep('otp')
     setLoading(false)
@@ -44,11 +38,10 @@ export default function AuthPage() {
     setError('')
     if (otp.length !== 6) { setError('Enter the 6-digit code.'); return }
     setLoading(true)
-    const formatted = formatPhone(phone)
     const { error: err } = await supabase.auth.verifyOtp({
-      phone: formatted,
+      email,
       token: otp,
-      type: 'sms',
+      type: 'email',
     })
     if (err) { setError(err.message); setLoading(false); return }
     router.push('/report')
@@ -60,7 +53,6 @@ export default function AuthPage() {
       flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: 24,
     }}>
-
       <div style={{
         maxWidth: 400, width: '100%',
         background: 'var(--navy-2)', border: '1px solid var(--border)',
@@ -70,7 +62,7 @@ export default function AuthPage() {
         {/* logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }}>
           <div style={{
-            width: 36, height: 36, flexShrink: 0,
+            width: 36, height: 36,
             background: 'linear-gradient(135deg, var(--green), var(--green-dim))',
             borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
             boxShadow: '0 0 20px var(--green-glow-strong)',
@@ -82,30 +74,30 @@ export default function AuthPage() {
           </span>
         </div>
 
-        {step === 'phone' && (
+        {step === 'email' && (
           <>
             <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: 22, fontWeight: 800, marginBottom: 8 }}>
               Sign in
             </h1>
             <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 28, lineHeight: 1.6 }}>
-              Enter your Bangladeshi mobile number. We'll send a one-time verification code.
+              Enter your email. We'll send a one-time verification code.
             </p>
 
             <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
-              Mobile number
+              Email address
             </label>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 10,
               background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)',
               borderRadius: 12, padding: '12px 14px', marginBottom: 8,
             }}>
-              <Phone size={16} color="var(--text-dim)" style={{ flexShrink: 0 }} />
+              <Mail size={16} color="var(--text-dim)" style={{ flexShrink: 0 }} />
               <input
-                type="tel"
-                value={phone}
-                onChange={e => { setPhone(e.target.value); setError('') }}
+                type="email"
+                value={email}
+                onChange={e => { setEmail(e.target.value); setError('') }}
                 onKeyDown={e => e.key === 'Enter' && sendOtp()}
-                placeholder="01XXXXXXXXX"
+                placeholder="you@example.com"
                 autoFocus
                 style={{
                   flex: 1, background: 'transparent', border: 'none',
@@ -121,7 +113,8 @@ export default function AuthPage() {
               onClick={sendOtp}
               disabled={loading}
               style={{
-                width: '100%', background: loading ? 'rgba(0,232,150,0.4)' : 'var(--green)',
+                width: '100%',
+                background: loading ? 'rgba(0,232,150,0.4)' : 'var(--green)',
                 color: 'var(--navy)', border: 'none', borderRadius: 12,
                 padding: '13px', fontSize: 14, fontWeight: 700,
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -147,7 +140,7 @@ export default function AuthPage() {
             }}>
               <CheckCircle size={16} color="var(--green)" />
               <p style={{ fontSize: 13, color: 'var(--green)' }}>
-                Code sent to {phone}
+                Code sent to {email}
               </p>
             </div>
 
@@ -155,12 +148,9 @@ export default function AuthPage() {
               Enter the code
             </h1>
             <p style={{ fontSize: 14, color: 'var(--text-dim)', marginBottom: 28, lineHeight: 1.6 }}>
-              Enter the 6-digit code sent to your phone.
+              Check your inbox for the 6-digit code.
             </p>
 
-            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
-              Verification code
-            </label>
             <input
               type="text"
               value={otp}
@@ -202,21 +192,23 @@ export default function AuthPage() {
             </button>
 
             <button
-              onClick={() => { setStep('phone'); setOtp(''); setError('') }}
+              onClick={() => { setStep('email'); setOtp(''); setError('') }}
               style={{
                 width: '100%', background: 'transparent', border: 'none',
                 color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer',
                 marginTop: 14, fontFamily: 'DM Sans, sans-serif',
               }}
             >
-              ← Use a different number
+              ← Use a different email
             </button>
           </>
         )}
 
         <p style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', marginTop: 24, lineHeight: 1.6 }}>
           By signing in you agree to our{' '}
-          <Link href="/terms" style={{ color: 'var(--green)', textDecoration: 'none' }}>Terms of Service</Link>
+          <Link href="/terms" style={{ color: 'var(--green)', textDecoration: 'none' }}>
+            Terms of Service
+          </Link>
         </p>
       </div>
 
