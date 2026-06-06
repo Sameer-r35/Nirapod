@@ -98,34 +98,44 @@ export default function ReportPage() {
   }
 
   async function handleSubmit() {
-    if (!validateStep()) return
-    setLoading(true)
-    setError('')
+  if (!validateStep()) return
+  setLoading(true)
+  setError('')
 
-    try {
-      const { data: { user } } = await createClient().auth.getUser()
-      if (!user) { setError('You must be logged in.'); setLoading(false); return }
+  try {
+    const { data: { user }, error: authError } = await createClient().auth.getUser()
+    console.log('Auth user:', user)
+    console.log('Auth error:', authError)
 
-      const proof_urls = await uploadProofFiles(files, user.id)
-      if (proof_urls.length === 0) {
-        setError('Failed to upload proof images. Please try again.')
-        setLoading(false)
-        return
-      }
+    if (!user) { setError('You must be logged in.'); setLoading(false); return }
 
-      const result = await submitReport({
-        fb_url: fbUrl, bkash_number_used: bkashNum,
-        report_type: reportType, description, proof_urls,
-      })
+    console.log('Files to upload:', files.length, files.map(f => f.name))
 
-      if (result.error) { setError(result.error); setLoading(false); return }
-      setDone(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
-    } finally {
+    const proof_urls = await uploadProofFiles(files, user.id)
+    console.log('Proof URLs after upload:', proof_urls)
+
+    if (proof_urls.length === 0) {
+      setError('Failed to upload proof images. Check console for details.')
       setLoading(false)
+      return
     }
+
+    const result = await submitReport({
+      fb_url: fbUrl, bkash_number_used: bkashNum,
+      report_type: reportType, description, proof_urls,
+    })
+
+    console.log('Submit result:', result)
+
+    if (result.error) { setError(result.error); setLoading(false); return }
+    setDone(true)
+  } catch (err) {
+    console.error('handleSubmit error:', err)
+    setError('Something went wrong. Please try again.')
+  } finally {
+    setLoading(false)
   }
+}
 
   // ── NOT AUTHED ──
   if (authChecked && !authed) {
@@ -514,7 +524,7 @@ function AuthGate({ isMobile }: { isMobile: boolean }) {
           padding: '13px', borderRadius: 10, fontSize: 14, fontWeight: 700,
           textDecoration: 'none', fontFamily: 'Syne, sans-serif',
         }}>
-          Sign in with phone number
+          Sign in with email
         </Link>
         <Link href="/" style={{ display: 'block', marginTop: 14, fontSize: 13, color: 'var(--text-dim)', textDecoration: 'none' }}>
           ← Back to search
