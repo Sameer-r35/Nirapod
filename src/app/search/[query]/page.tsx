@@ -53,22 +53,35 @@ export default async function SearchResultPage({ params }: PageProps) {
       .eq('bkash_number_used', decoded).eq('status', 'verified').order('created_at', { ascending: false })
     reports = pr ?? []
   } else {
-    const canonical    = normalizeFacebookUrl(decoded)
-    console.log('DEBUG canonical:', canonical)
-console.log('DEBUG decoded:', decoded)
-    const { data: entityData, error: entityError } = await supabase
-  .from('entities')
-  .select('*')
-  .eq('canonical_id', canonical)
-  .single()
+    const canonical = normalizeFacebookUrl(decoded)
 
-console.log('DEBUG entity data:', entityData)
-console.log('DEBUG entity error:', entityError)
+    const { data: exactMatch } = await supabase
+      .from('entities')
+      .select('*')
+      .eq('canonical_id', canonical)
+      .maybeSingle()
 
-entity = entityData
+    if (exactMatch) {
+      entity = exactMatch
+    } else {
+      const { data: fuzzyMatch } = await supabase
+        .from('entities')
+        .select('*')
+        .or(`canonical_id.ilike.%${canonical}%,fb_url.ilike.%${canonical}%`)
+        .order('total_reports', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      entity = fuzzyMatch
+    }
+
     if (entity) {
-      const { data: rd } = await supabase.from('incident_reports').select('*')
-        .eq('entity_id', entity.id).eq('status', 'verified').order('created_at', { ascending: false })
+      const { data: rd } = await supabase
+        .from('incident_reports')
+        .select('*')
+        .eq('entity_id', entity.id)
+        .eq('status', 'verified')
+        .order('created_at', { ascending: false })
       reports = rd ?? []
     }
   }
@@ -114,7 +127,6 @@ entity = entityData
 
       <main style={{ maxWidth: 680, margin: '0 auto', padding: '32px 20px 80px' }}>
 
-        {/* back */}
         <Link href="/" style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           fontSize: 13, color: 'var(--text-dim)', textDecoration: 'none', marginBottom: 28,
@@ -122,7 +134,6 @@ entity = entityData
           <ArrowLeft size={14} /> Back to search
         </Link>
 
-        {/* query label */}
         <div style={{ marginBottom: 24 }}>
           <p style={{
             fontSize: 11, letterSpacing: 3, textTransform: 'uppercase',
@@ -138,7 +149,6 @@ entity = entityData
           </h1>
         </div>
 
-        {/* ── NO RESULTS ── */}
         {noResults && (
           <div style={{
             background: 'rgba(0,232,150,0.05)', border: '1px solid rgba(0,232,150,0.2)',
@@ -167,7 +177,6 @@ entity = entityData
           </div>
         )}
 
-        {/* ── ENTITY FOUND ── */}
         {entity && !isPhone && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <TrustDial score={entity.trust_score} />
@@ -192,7 +201,6 @@ entity = entityData
               ))}
             </div>
 
-            {/* penalty breakdown */}
             {reports.length > 0 && (
               <div style={{
                 background: 'var(--navy-2)', border: '1px solid var(--border)',
@@ -242,7 +250,6 @@ entity = entityData
           </div>
         )}
 
-        {/* ── BKASH SEARCH ── */}
         {isPhone && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {linkedEntities.length === 0 && reports.length === 0 ? (
@@ -296,7 +303,6 @@ entity = entityData
           </div>
         )}
 
-        {/* ── VERIFIED REPORTS ── */}
         {reports.length > 0 && (
           <div style={{ marginTop: 32 }}>
             <p style={{
