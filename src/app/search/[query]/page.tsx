@@ -13,10 +13,43 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { query } = await params
-  const decoded = decodeURIComponent(query)
+  const decoded   = decodeURIComponent(query)
+  const isPhone   = isBkashNumber(decoded)
+
+  const supabase  = await createServerSupabaseClient()
+  const canonical = normalizeFacebookUrl(decoded)
+
+  const { data: entity } = await supabase
+    .from('entities')
+    .select('trust_score, total_reports, fb_url')
+    .eq('canonical_id', canonical)
+    .maybeSingle()
+
+  const riskLevel = !entity
+    ? 'Not yet rated'
+    : entity.trust_score >= 80
+      ? 'Safe'
+      : entity.trust_score >= 40
+        ? 'Caution'
+        : 'High Risk'
+
+  const title = isPhone
+    ? `${decoded} — bKash Number Trust Check`
+    : `${decoded} — Facebook Page Trust Score`
+
+  const description = entity
+    ? `${decoded} has a trust score of ${entity.trust_score}/100 (${riskLevel}) with ${entity.total_reports} verified report(s) on Nirapod.`
+    : `No scam reports found for ${decoded} on Nirapod. Check before you pay.`
+
   return {
-    title: `${decoded} — Nirapod Trust Check`,
-    description: `Community trust score for ${decoded}. Check before you pay.`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url:      `https://nirapod.com/search/${encodeURIComponent(decoded)}`,
+      siteName: 'Nirapod',
+    },
   }
 }
 
